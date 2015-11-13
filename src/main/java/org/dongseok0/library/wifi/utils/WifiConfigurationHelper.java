@@ -1,7 +1,6 @@
 package org.dongseok0.library.wifi.utils;
 
 import android.net.LinkAddress;
-import android.net.LinkProperties;
 import android.net.RouteInfo;
 import android.net.wifi.*;
 import android.net.wifi.WifiConfiguration;
@@ -21,13 +20,65 @@ import java.net.InetAddress;
  * Created by dongseok0 on 6/11/2015.
  */
 public class WifiConfigurationHelper {
+    private Field disableReason;
+    private Method setClientCertificateAlias;
+    private Method getClientCertificateAlias;
+    private Method getCaCertificateAlias;
+    private Method setCaCertificateAlias;
+    private Field proxySettings;
+    private Object[] proxySettingsConsts;
+    private Method getPort;
+    private Method getExclusionList;
+    private Method getHost;
+    private Method setHttpProxy;
+    private Method getHttpProxy;
+    private Constructor proxyPropertiesCtr;
+    private Field fieldLinkProperties;
+    private Field ipAssignment;
+    private Object[] ipAssignmentConsts;
+    private Class proxyPropertiesCls;
+
+    public WifiConfigurationHelper() {
+        try {
+            fieldLinkProperties = WifiConfiguration.class.getField("linkProperties");
+
+            ipAssignment = WifiConfiguration.class.getDeclaredField("ipAssignment");
+            ipAssignmentConsts = ipAssignment.getType().getEnumConstants();
+
+            proxySettings = WifiConfiguration.class.getDeclaredField("proxySettings");
+            proxySettingsConsts = proxySettings.getType().getEnumConstants();
+
+            proxyPropertiesCls = Class.forName("android.net.ProxyProperties");
+            proxyPropertiesCtr = proxyPropertiesCls.getDeclaredConstructor(String.class, int.class, String.class);
+
+            getHttpProxy = fieldLinkProperties.getType().getDeclaredMethod("getHttpProxy");
+            setHttpProxy = fieldLinkProperties.getType().getDeclaredMethod("setHttpProxy", proxyPropertiesCls);
+
+            getHost = proxyPropertiesCls.getDeclaredMethod("getHost");
+            getPort = proxyPropertiesCls.getDeclaredMethod("getPort");
+            getExclusionList = proxyPropertiesCls.getDeclaredMethod("getExclusionList");
+
+            setCaCertificateAlias = WifiEnterpriseConfig.class.getDeclaredMethod("setCaCertificateAlias", String.class);
+            getCaCertificateAlias = WifiEnterpriseConfig.class.getDeclaredMethod("getCaCertificateAlias");
+
+            setClientCertificateAlias = WifiEnterpriseConfig.class.getDeclaredMethod("setClientCertificateAlias", String.class);
+            getClientCertificateAlias = WifiEnterpriseConfig.class.getDeclaredMethod("getClientCertificateAlias");
+
+            disableReason = WifiConfiguration.class.getField("disableReason");
+
+        } catch (NoSuchFieldException e) {
+            e.printStackTrace();
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        } catch (NoSuchMethodException e) {
+            e.printStackTrace();
+        }
+    }
 
     public void setIpProxy(WifiConfiguration config, JSONObject jsonConfig) {
         try {
-            LinkProperties linkProperties = (LinkProperties) config.getClass().getField("linkProperties").get(config);
+            Object linkProperties = fieldLinkProperties.get(config);
 
-            Field ipAssignment = config.getClass().getDeclaredField("ipAssignment");
-            Object[] ipAssignmentConsts = ipAssignment.getType().getEnumConstants();
             if (jsonConfig.has("ip") && jsonConfig.has("prefix_length")) {
                 InetAddress ipAddress = NetworkUtils.numericToInetAddress(jsonConfig.getString("ip"));
                 int prefixLength = jsonConfig.getInt("prefix_length");
@@ -64,8 +115,6 @@ public class WifiConfigurationHelper {
                 addDns.invoke(linkProperties, dns2);
             }
 
-            Field proxySettings = config.getClass().getDeclaredField("proxySettings");
-            Object[] proxySettingsConsts = proxySettings.getType().getEnumConstants();
             if (jsonConfig.has("proxy_host")) {
                 String host = jsonConfig.getString("proxy_host");
                 String port = jsonConfig.getString("proxy_port");
@@ -84,19 +133,15 @@ public class WifiConfigurationHelper {
 
     public String[] getProxyFields(WifiConfiguration config) {
         try {
-            Object linkProperties = config.getClass().getField("linkProperties").get(config);
-            Object proxyProperties = linkProperties.getClass().getDeclaredMethod("getHttpProxy").invoke(linkProperties);
+            Object linkProperties = fieldLinkProperties.get(config);
+            Object proxyProperties = getHttpProxy.invoke(linkProperties);
             if (proxyProperties != null) {
-                String host = (String) proxyProperties.getClass().getDeclaredMethod("getHost").invoke(proxyProperties);
-                String port = Integer.toString((int) proxyProperties.getClass().getDeclaredMethod("getPort").invoke(proxyProperties));
-                String exclusionList = (String) proxyProperties.getClass().getDeclaredMethod("getExclusionList").invoke(proxyProperties);
+                String host = (String) getHost.invoke(proxyProperties);
+                String port = Integer.toString((int) getPort.invoke(proxyProperties));
+                String exclusionList = (String) getExclusionList.invoke(proxyProperties);
                 return new String[]{host, port, exclusionList};
             }
         } catch (IllegalAccessException e) {
-            e.printStackTrace();
-        } catch (NoSuchFieldException e) {
-            e.printStackTrace();
-        } catch (NoSuchMethodException e) {
             e.printStackTrace();
         } catch (InvocationTargetException e) {
             e.printStackTrace();
@@ -106,22 +151,12 @@ public class WifiConfigurationHelper {
 
     public boolean setProxyFields(WifiConfiguration config, String host, String port, String exclusionList) {
         try {
-            Object linkProperties = config.getClass().getField("linkProperties").get(config);
-            Class proxyPropertiesCls = Class.forName("android.net.ProxyProperties");
-            Constructor proxyPropertiesCtr = proxyPropertiesCls.getDeclaredConstructor(String.class, int.class, String.class);
-
-            Method setHttpProxy = linkProperties.getClass().getDeclaredMethod("setHttpProxy", proxyPropertiesCls);
+            Object linkProperties = fieldLinkProperties.get(config);
             setHttpProxy.invoke(linkProperties, proxyPropertiesCtr.newInstance(host, Integer.parseInt(port), exclusionList));
             return true;
         } catch (IllegalAccessException e) {
             e.printStackTrace();
-        } catch (NoSuchFieldException e) {
-            e.printStackTrace();
-        } catch (NoSuchMethodException e) {
-            e.printStackTrace();
         } catch (InvocationTargetException e) {
-            e.printStackTrace();
-        } catch (ClassNotFoundException e) {
             e.printStackTrace();
         } catch (InstantiationException e) {
             e.printStackTrace();
@@ -131,9 +166,7 @@ public class WifiConfigurationHelper {
 
     public IpAssignment getIpAssignment(WifiConfiguration config) {
         try {
-            return IpAssignment.values()[((Enum) config.getClass().getDeclaredField("ipAssignment").get(config)).ordinal()];
-        } catch (NoSuchFieldException e) {
-            e.printStackTrace();
+            return IpAssignment.values()[((Enum) ipAssignment.get(config)).ordinal()];
         } catch (IllegalAccessException e) {
             e.printStackTrace();
         }
@@ -142,9 +175,7 @@ public class WifiConfigurationHelper {
 
     public ProxySettings getProxySettings(WifiConfiguration config) {
         try {
-            return ProxySettings.values()[((Enum) config.getClass().getDeclaredField("proxySettings").get(config)).ordinal()];
-        } catch (NoSuchFieldException e) {
-            e.printStackTrace();
+            return ProxySettings.values()[((Enum) proxySettings.get(config)).ordinal()];
         } catch (IllegalAccessException e) {
             e.printStackTrace();
         }
@@ -153,10 +184,7 @@ public class WifiConfigurationHelper {
 
     public void setCaCertificateAlias(WifiConfiguration config, String caCert) {
         try {
-            Method setCaCertificateAlias = config.enterpriseConfig.getClass().getDeclaredMethod("setCaCertificateAlias", String.class);
             setCaCertificateAlias.invoke(config.enterpriseConfig, caCert);
-        } catch (NoSuchMethodException e) {
-            e.printStackTrace();
         } catch (InvocationTargetException e) {
             e.printStackTrace();
         } catch (IllegalAccessException e) {
@@ -166,10 +194,7 @@ public class WifiConfigurationHelper {
 
     public String getCaCertificateAlias(WifiEnterpriseConfig enterpriseConfig) {
         try {
-            Method getCaCertificateAlias = enterpriseConfig.getClass().getDeclaredMethod("getCaCertificateAlias");
             return (String) getCaCertificateAlias.invoke(enterpriseConfig);
-        } catch (NoSuchMethodException e) {
-            e.printStackTrace();
         } catch (InvocationTargetException e) {
             e.printStackTrace();
         } catch (IllegalAccessException e) {
@@ -180,10 +205,7 @@ public class WifiConfigurationHelper {
 
     public void setClientCertificateAlias(WifiConfiguration config, String clientCert) {
         try {
-            Method setClientCertificateAlias = config.enterpriseConfig.getClass().getDeclaredMethod("setClientCertificateAlias", String.class);
             setClientCertificateAlias.invoke(config.enterpriseConfig, clientCert);
-        } catch (NoSuchMethodException e) {
-            e.printStackTrace();
         } catch (InvocationTargetException e) {
             e.printStackTrace();
         } catch (IllegalAccessException e) {
@@ -193,10 +215,7 @@ public class WifiConfigurationHelper {
 
     public String getClientCertificateAlias(WifiEnterpriseConfig enterpriseConfig) {
         try {
-            Method getClientCertificateAlias = enterpriseConfig.getClass().getDeclaredMethod("getClientCertificateAlias");
             return (String) getClientCertificateAlias.invoke(enterpriseConfig);
-        } catch (NoSuchMethodException e) {
-            e.printStackTrace();
         } catch (InvocationTargetException e) {
             e.printStackTrace();
         } catch (IllegalAccessException e) {
@@ -207,9 +226,7 @@ public class WifiConfigurationHelper {
 
     public int getDisableReason(WifiConfiguration config) {
         try {
-            return config.getClass().getField("disableReason").getInt(config);
-        } catch (NoSuchFieldException e) {
-            e.printStackTrace();
+            return disableReason.getInt(config);
         } catch (IllegalAccessException e) {
             e.printStackTrace();
         }
