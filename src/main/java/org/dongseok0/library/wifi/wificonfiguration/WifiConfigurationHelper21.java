@@ -1,4 +1,4 @@
-package org.dongseok0.library.wifi.utils;
+package org.dongseok0.library.wifi.wificonfiguration;
 
 import android.net.LinkAddress;
 import android.net.wifi.WifiConfiguration;
@@ -17,15 +17,15 @@ import java.net.InetAddress;
 /**
  * Created by dongseok0 on 6/11/2015.
  */
-public class WifiConfigurationHelper20 extends WifiConfigurationHelper {
+public class WifiConfigurationHelper21 extends WifiConfigurationHelper {
     private Constructor     staticIpConfigurationCtr;
+    private Field           ipConfiguration;
     private Object[]        proxySettingsConsts;
     private Field           proxySettings;
     private Object[]        ipAssignmentConsts;
     private Field           ipAssignment;
-    private Field           ipConfiguration;
 
-    public WifiConfigurationHelper20() {
+    public WifiConfigurationHelper21() {
         super();
 
         try {

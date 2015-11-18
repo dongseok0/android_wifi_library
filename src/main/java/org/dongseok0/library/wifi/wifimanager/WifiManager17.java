@@ -1,4 +1,4 @@
-package org.dongseok0.library.wifi.reflection;
+package org.dongseok0.library.wifi.wifimanager;
 
 import android.content.Context;
 import android.net.wifi.WifiConfiguration;
